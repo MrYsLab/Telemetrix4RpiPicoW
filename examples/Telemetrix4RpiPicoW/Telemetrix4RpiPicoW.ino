@@ -108,7 +108,7 @@
 #define STEPPER_GET_CURRENT_POSITION 50
 #define STEPPER_GET_DISTANCE_TO_GO 51
 #define STEPPER_GET_TARGET_POSITION 52
-#define RESET_DATA_STRUCTURES 53
+#define RESET_BOARD 53
 #define INIT_NEOPIXELS 54
 #define SHOW_NEOPIXELS 55
 #define SET_NEOPIXEL 56
@@ -228,7 +228,7 @@ extern void stepper_set_enable_pin();
 
 extern void stepper_is_running();
 
-extern void reset_data_structures();
+extern void reset_board();
 
 extern void init_neo_pixels();
 
@@ -239,6 +239,8 @@ extern void set_neo_pixel();
 extern void clear_all_neo_pixels();
 
 extern void fill_neo_pixels();
+
+extern void reset_board();
 
 // When adding a new command update the command_table.
 // The command length is the number of bytes that follow
@@ -311,7 +313,7 @@ command_descriptor command_table[] =
   (&stepper_get_current_position),
   {&stepper_get_distance_to_go},
   (&stepper_get_target_position),
-  (&reset_data_structures),
+  (&reset_board),
   {init_neo_pixels},
   {show_neo_pixels},
   {set_neo_pixel},
@@ -656,33 +658,13 @@ void modify_reporting()
   }
 }
 
-void reset_data_structures() {
+void reset_board() {
   stop_all_reports();
 
   delay(100);
-  if (command_buffer[0]) {
-    rebooting = true;
-    watchdog_reboot(0, 0, 0);
-    watchdog_enable(100, 0);
-    //client.stop();
-    while (1) {
-      delay(3);
-    }
-  }
-  // detach any attached servos
-  for (int i = 0; i < MAX_SERVOS; i++) {
-    if (servos[i].attached() == true) {
-      servos[i].detach();
-    }
-  }
+  rebooting = true;
+  rp2040.reboot();
 
-  sonars_index = 0; // reset the index into the sonars array
-
-  memset(sonars, 0, sizeof(sonars));
-
-  dht_index = 0;
-
-  memset(dhts, 0, sizeof(dhts));
 }
 
 // Return the firmware version number
