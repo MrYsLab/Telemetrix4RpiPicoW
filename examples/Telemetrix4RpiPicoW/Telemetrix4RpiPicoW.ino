@@ -114,6 +114,8 @@
 #define SET_NEOPIXEL 56
 #define CLEAR_NEOPIXELS 57
 #define FILL_NEOPIXELS 58
+#define PWM_FREQ 59
+#define PWM_RANGE 60
 
 /* Command Forward References*/
 
@@ -242,6 +244,10 @@ extern void fill_neo_pixels();
 
 extern void reset_board();
 
+extern void set_pwm_freq();
+
+extern void set_pwm_range();
+
 // When adding a new command update the command_table.
 // The command length is the number of bytes that follow
 // the command byte itself, and does not include the command
@@ -319,6 +325,8 @@ command_descriptor command_table[] =
   {set_neo_pixel},
   {clear_all_neo_pixels},
   {fill_neo_pixels},
+  {set_pwm_freq},
+  {set_pwm_range},
 };
 
 // maximum length of a command in bytes
@@ -510,7 +518,6 @@ OneWire *ow = NULL;
 #define MAX_NUMBER_OF_STEPPERS 4
 
 // stepper motor data
-//#if !defined (__AVR_ATmega328P__)
 AccelStepper *steppers[MAX_NUMBER_OF_STEPPERS];
 
 // stepper run modes
@@ -606,7 +613,33 @@ void analog_write()
   pin = command_buffer[0];
 
   value = (command_buffer[1] << 8) + command_buffer[2];
+
   analogWrite(pin, value);
+}
+
+void set_pwm_freq() {
+  // command_buffer[0] = freq_msb
+  // command_buffer[1] = msb3
+  // command_buffer[2] = msb2
+  // command_buffer[3] = lsb
+
+  uint32_t frequency = command_buffer[0] << 24 + command_buffer[1] << 16 +
+                       command_buffer[2] << 8 + command_buffer[3];
+
+  analogWriteFreq(frequency);
+}
+
+void set_pwm_range() {
+  // command_buffer[0] = range_msb
+  // command_buffer[1] = msb3
+  // command_buffer[2] = msb2
+  // command_buffer[3] = lsb
+
+  uint32_t pwm_range = command_buffer[0] << 24 + command_buffer[1] << 16 +
+                       command_buffer[2] << 8 + command_buffer[3];
+
+  analogWriteRange(pwm_range);
+
 }
 
 // This method allows you modify what reports are generated.
@@ -1110,7 +1143,6 @@ void fill_neo_pixels() {
 }
 
 void stepper_move_to() {
-  //#if !defined (__AVR_ATmega328P__)
 
   // motor_id = command_buffer[0]
   // position MSB = command_buffer[1]
@@ -1131,7 +1163,6 @@ void stepper_move_to() {
 }
 
 void stepper_move() {
-  //#if !defined (__AVR_ATmega328P__)
 
   // motor_id = command_buffer[0]
   // position MSB = command_buffer[1]
@@ -1153,19 +1184,16 @@ void stepper_move() {
 }
 
 void stepper_run() {
-  //#if !defined (__AVR_ATmega328P__)
   stepper_run_modes[command_buffer[0]] = STEPPER_RUN;
 }
 
 void stepper_run_speed() {
   // motor_id = command_buffer[0]
-  //#if !defined (__AVR_ATmega328P__)
 
   stepper_run_modes[command_buffer[0]] = STEPPER_RUN_SPEED;
 }
 
 void stepper_set_max_speed() {
-  //#if !defined (__AVR_ATmega328P__)
 
   // motor_id = command_buffer[0]
   // speed_msb = command_buffer[1]
@@ -1176,7 +1204,6 @@ void stepper_set_max_speed() {
 }
 
 void stepper_set_acceleration() {
-  //#if !defined (__AVR_ATmega328P__)
 
   // motor_id = command_buffer[0]
   // accel_msb = command_buffer[1]
@@ -1191,14 +1218,12 @@ void stepper_set_speed() {
   // motor_id = command_buffer[0]
   // speed_msb = command_buffer[1]
   // speed_lsb = command_buffer[2]
-  //#if !defined (__AVR_ATmega328P__)
 
   float speed = (float) ((command_buffer[1] << 8) + command_buffer[2]);
   steppers[command_buffer[0]]->setSpeed(speed);
 }
 
 void stepper_get_distance_to_go() {
-  //#if !defined (__AVR_ATmega328P__)
   // motor_id = command_buffer[0]
 
   // report = STEPPER_DISTANCE_TO_GO, motor_id, distance(8 bytes)
@@ -1220,7 +1245,6 @@ void stepper_get_distance_to_go() {
 }
 
 void stepper_get_target_position() {
-  //#if !defined (__AVR_ATmega328P__)
   // motor_id = command_buffer[0]
 
   // report = STEPPER_TARGET_POSITION, motor_id, distance(8 bytes)
@@ -1242,7 +1266,6 @@ void stepper_get_target_position() {
 }
 
 void stepper_get_current_position() {
-  //#if !defined (__AVR_ATmega328P__)
   // motor_id = command_buffer[0]
 
   // report = STEPPER_CURRENT_POSITION, motor_id, distance(8 bytes)
@@ -1264,7 +1287,6 @@ void stepper_get_current_position() {
 }
 
 void stepper_set_current_position() {
-  //#if !defined (__AVR_ATmega328P__)
   // motor_id = command_buffer[0]
   // position MSB = command_buffer[1]
   // position MSB-1 = command_buffer[2]
@@ -1281,13 +1303,11 @@ void stepper_set_current_position() {
 }
 
 void stepper_run_speed_to_position() {
-  //#if !defined (__AVR_ATmega328P__)
   stepper_run_modes[command_buffer[0]] = STEPPER_RUN_SPEED_TO_POSITION;
 
 }
 
 void stepper_stop() {
-  //#if !defined (__AVR_ATmega328P__)
   steppers[command_buffer[0]]->stop();
   steppers[command_buffer[0]]->disableOutputs();
   stepper_run_modes[command_buffer[0]] = STEPPER_STOP;
@@ -1296,28 +1316,23 @@ void stepper_stop() {
 }
 
 void stepper_disable_outputs() {
-  //#if !defined (__AVR_ATmega328P__)
   steppers[command_buffer[0]]->disableOutputs();
 }
 
 void stepper_enable_outputs() {
-  //#if !defined (__AVR_ATmega328P__)
   steppers[command_buffer[0]]->enableOutputs();
 }
 
 void stepper_set_minimum_pulse_width() {
-  //#if !defined (__AVR_ATmega328P__)
   unsigned int pulse_width = (command_buffer[1] << 8) + command_buffer[2];
   steppers[command_buffer[0]]->setMinPulseWidth(pulse_width);
 }
 
 void stepper_set_enable_pin() {
-  //#if !defined (__AVR_ATmega328P__)
   steppers[command_buffer[0]]->setEnablePin((uint8_t) command_buffer[1]);
 }
 
 void stepper_set_3_pins_inverted() {
-  //#if !defined (__AVR_ATmega328P__)
   // command_buffer[1] = directionInvert
   // command_buffer[2] = stepInvert
   // command_buffer[3] = enableInvert
@@ -1332,7 +1347,6 @@ void stepper_set_4_pins_inverted() {
   // command_buffer[3] = pin3
   // command_buffer[4] = pin4
   // command_buffer[5] = enable
-  //#if !defined (__AVR_ATmega328P__)
   steppers[command_buffer[0]]->setPinsInverted((bool) command_buffer[1],
       (bool) command_buffer[2],
       (bool) command_buffer[3],
@@ -1341,7 +1355,6 @@ void stepper_set_4_pins_inverted() {
 }
 
 void stepper_is_running() {
-  //#if !defined (__AVR_ATmega328P__)
   // motor_id = command_buffer[0]
 
   // report = STEPPER_IS_RUNNING, motor_id, distance(8 bytes)
@@ -1750,7 +1763,8 @@ void setup()
   for ( int i = 0; i < MAX_NUMBER_OF_STEPPERS; i++) {
     stepper_run_modes[i] = STEPPER_STOP ;
   }
-
+  // set the range to be compatible with the non-wifi pico telemetrix library
+  analogWriteRange(20000) ;
   init_pin_structures();
 
   Serial.begin(115200);
@@ -1766,11 +1780,8 @@ void loop()
     { // stop reporting
       scan_digital_inputs();
       scan_analog_inputs();
-
       scan_sonars();
-
       scan_dhts();
-      //#if !defined (__AVR_ATmega328P__)
       run_steppers();
     }
   }
