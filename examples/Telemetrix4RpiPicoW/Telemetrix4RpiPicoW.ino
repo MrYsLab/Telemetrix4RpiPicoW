@@ -623,8 +623,8 @@ void set_pwm_freq() {
   // command_buffer[2] = msb2
   // command_buffer[3] = lsb
 
-  uint32_t frequency = command_buffer[0] << 24 + command_buffer[1] << 16 +
-                       command_buffer[2] << 8 + command_buffer[3];
+  uint32_t frequency = (command_buffer[0] << 24) + (command_buffer[1] << 16) +
+                       (command_buffer[2] << 8) + command_buffer[3];
 
   analogWriteFreq(frequency);
 }
@@ -635,8 +635,8 @@ void set_pwm_range() {
   // command_buffer[2] = msb2
   // command_buffer[3] = lsb
 
-  uint32_t pwm_range = command_buffer[0] << 24 + command_buffer[1] << 16 +
-                       command_buffer[2] << 8 + command_buffer[3];
+  uint32_t pwm_range = (command_buffer[0] << 24) + (command_buffer[1] << 16) +
+                       (command_buffer[2] << 8) + command_buffer[3];
 
   analogWriteRange(pwm_range);
 
@@ -1427,7 +1427,7 @@ void get_next_command()
       }
       command_buffer[i] = (byte)Serial.read();
       // uncomment out to see each of the bytes following the command
-      //send_debug_info(i, command_buffer[i]);
+      // send_debug_info(i, command_buffer[i]);
     }
   }
   command_entry.command_func();
