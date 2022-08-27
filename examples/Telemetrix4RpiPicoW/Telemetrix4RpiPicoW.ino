@@ -116,6 +116,7 @@
 #define FILL_NEOPIXELS 58
 #define PWM_FREQ 59
 #define PWM_RANGE 60
+#define GET_CPU_TEMP 61
 
 /* Command Forward References*/
 
@@ -248,6 +249,8 @@ extern void set_pwm_freq();
 
 extern void set_pwm_range();
 
+extern void get_cpu_temp();
+
 // When adding a new command update the command_table.
 // The command length is the number of bytes that follow
 // the command byte itself, and does not include the command
@@ -327,6 +330,7 @@ command_descriptor command_table[] =
   {fill_neo_pixels},
   {set_pwm_freq},
   {set_pwm_range},
+  {get_cpu_temp},
 };
 
 // maximum length of a command in bytes
@@ -359,6 +363,7 @@ byte command_buffer[MAX_COMMAND_LENGTH];
 #define STEPPER_CURRENT_POSITION 17
 #define STEPPER_RUNNING_REPORT 18
 #define STEPPER_RUN_COMPLETE_REPORT 19
+#define CPU_TEMP_REPORT 20
 #define DEBUG_PRINT 99
 
 // A buffer to hold i2c report data
@@ -405,7 +410,7 @@ bool rebooting = false;
 // OUTPUT defined in Arduino.h = 1
 // INPUT_PULLUP defined in Arduino.h = 2
 // The following are defined for arduino_telemetrix (AT)
-#define AT_ANALOG 3
+#define AT_ANALOG 5
 #define AT_MODE_NOT_SET 255
 
 // maximum number of pins supported
@@ -416,7 +421,7 @@ bool rebooting = false;
 // To translate a pin number from an integer value to its analog pin number
 // equivalent, this array is used to look up the value to use for the pin.
 
-int analog_read_pins[20] = {A0, A1, A2, A3};
+int analog_read_pins[4] = {A0, A1, A2, A3};
 
 // a descriptor for digital pins
 struct pin_descriptor
@@ -448,6 +453,13 @@ unsigned long current_millis;  // for analog input loop
 unsigned long previous_millis; // for analog input loop
 uint8_t analog_sampling_interval = 19;
 
+// cpu temp comparison threshold
+float cpu_temp_threshold = 0.0;
+float cpu_temp_last_value = 0.0;
+bool monitor_cpu_temp = false;
+unsigned long cpu_temp_current_millis;  // for cpu temp loop
+unsigned long cpu_temp_previous_millis; // for cpu temp loop
+uint16_t cpu_temp_sampling_interval = 1000;
 
 /* %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 /*  Feature Related Defines, Data Structures and Storage Allocation */
@@ -640,6 +652,17 @@ void set_pwm_range() {
 
   analogWriteRange(pwm_range);
 
+}
+
+void get_cpu_temp() {
+
+  //byte b[4] = {0,0,0,0};
+
+  memcpy(&cpu_temp_threshold, &command_buffer[0], sizeof(float));
+
+  uint16_t cpu_temp_sampling_interval =  (command_buffer[4] << 8) + command_buffer[5];
+
+  monitor_cpu_temp = true;
 }
 
 // This method allows you modify what reports are generated.
@@ -1582,6 +1605,38 @@ void scan_analog_inputs()
   }
 }
 
+void scan_cpu_temp() {
+
+  float cpu_temp, differential ;
+  char output[sizeof(float)];
+
+  byte report_message[6] = {5, CPU_TEMP_REPORT, 0, 0, 0, 0};
+
+  if (monitor_cpu_temp) {
+    cpu_temp_current_millis = millis();
+    if (cpu_temp_current_millis - cpu_temp_previous_millis > cpu_temp_sampling_interval)
+    {
+      cpu_temp_previous_millis = cpu_temp_current_millis;
+      cpu_temp = analogReadTemp();
+
+      differential = abs(cpu_temp - cpu_temp_last_value);
+      if (differential >= cpu_temp_threshold)
+      {
+
+        cpu_temp_last_value = cpu_temp;
+
+        memcpy(output, &cpu_temp, sizeof(float));
+        report_message[2] = output[0];
+        report_message[3] = output[1];
+        report_message[4] = output[2];
+        report_message[5] = output[3];
+        Serial.write(report_message, 6);
+        delay(1);
+      }
+    }
+  }
+}
+
 // scan the sonar devices for changes
 void scan_sonars()
 {
@@ -1782,6 +1837,7 @@ void loop()
       scan_analog_inputs();
       scan_sonars();
       scan_dhts();
+      scan_cpu_temp();
       run_steppers();
     }
   }
