@@ -582,6 +582,11 @@ void set_pin_mode()
       the_digital_pins[pin].reporting_enabled = command_buffer[2];
       pinMode(pin, INPUT_PULLUP);
       break;
+    case INPUT_PULLDOWN:
+      the_digital_pins[pin].pin_mode = mode;
+      the_digital_pins[pin].reporting_enabled = command_buffer[2];
+      pinMode(pin, INPUT_PULLDOWN);
+      break;
     case OUTPUT:
       the_digital_pins[pin].pin_mode = mode;
       pinMode(pin, OUTPUT);
@@ -1487,7 +1492,7 @@ void reset_data() {
 
   dht_current_millis = 0;      // for analog input loop
   dht_previous_millis = 0;     // for analog input loop
-  dht_scan_interval = 2000;    // scan dht's every 2 seconds
+  dht_scan_interval = 2200;    // scan dht's every 2 seconds
 
   memset(dhts, 0, sizeof(dhts));
   enable_all_reports();
@@ -1679,8 +1684,7 @@ void scan_sonars()
 }
 
 // scan dht devices for changes
-void scan_dhts()
-{
+void scan_dhts() {
   // prebuild report for valid data
   // reuse the report if a read command fails
 
@@ -1728,7 +1732,6 @@ void scan_dhts()
 
         // if rv is not zero, this is an error report
         if (rv) {
-          //client.write(report_message, 10);
           Serial.write(report_message, 10);
           return;
         } else {
@@ -1755,10 +1758,7 @@ void scan_dhts()
 
           report_message[8] = (uint8_t) j;
           report_message[9] = (uint8_t)(f * 100);
-          //client.write(report_message, 10);
           Serial.write(report_message, 10);
-
-
         }
       }
     }
