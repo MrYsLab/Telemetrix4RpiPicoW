@@ -40,7 +40,7 @@
 #include <Wire.h>
 #include <dhtnew.h>
 #include <SPI.h>
-#include <OneWire.h>
+//#include <OneWire.h> // library is not available for the pico
 #include <AccelStepper.h>
 #include <NeoPixelConnect.h>
 
@@ -525,7 +525,7 @@ unsigned int dht_scan_interval = 2200; // scan dht's every 2 seconds
 /* OneWire Object*/
 
 // a pointer to a OneWire object
-OneWire *ow = NULL;
+// OneWire *ow = NULL;
 
 #define MAX_NUMBER_OF_STEPPERS 4
 
@@ -562,7 +562,7 @@ void set_pin_mode()
 /*
     Set a pin to digital input, digital input_pullup, digital output,
     and analog input. PWM is considered digital output, and i2c, spi, dht,
-    sonar, servo, and onewire have their own init methods.
+    sonar, and servo have their own init methods.
 */
 {
   byte pin;
@@ -1043,41 +1043,43 @@ void spi_cs_control() {
   digitalWrite(cs_pin, cs_state);
 }
 
+/* onewire is not yet implemented for the pico. these are place holders */
+
 // Initialize the OneWire interface
 void onewire_init() {
-  ow = new OneWire(command_buffer[0]);
+  //ow = new OneWire(command_buffer[0]);
 }
 
 // send a OneWire reset
 void onewire_reset() {
 
-  uint8_t reset_return = ow->reset();
-  uint8_t onewire_report_message[] = {3, ONE_WIRE_REPORT, ONE_WIRE_RESET, reset_return};
+  //uint8_t reset_return = ow->reset();
+  //uint8_t onewire_report_message[] = {3, ONE_WIRE_REPORT, ONE_WIRE_RESET, reset_return};
 
-  Serial.write(onewire_report_message, 4);
+  //Serial.write(onewire_report_message, 4);
 }
 
 // send a OneWire select
 void onewire_select() {
 
-  uint8_t dev_address[8];
+  //uint8_t dev_address[8];
 
-  for (int i = 0; i < 8; i++) {
-    dev_address[i] = command_buffer[i];
-  }
-  ow->select(dev_address);
+  //for (int i = 0; i < 8; i++) {
+  //  dev_address[i] = command_buffer[i];
+  //}
+  //ow->select(dev_address);
 }
 
 // send a OneWire skip
 void onewire_skip() {
-  ow->skip();
+  //ow->skip();
 }
 
 // write 1 byte to the OneWire device
 void onewire_write() {
 
   // write data and power values
-  ow->write(command_buffer[0], command_buffer[1]);
+  //ow->write(command_buffer[0], command_buffer[1]);
 }
 
 // read one byte from the OneWire device
@@ -1088,37 +1090,37 @@ void onewire_read() {
   // onewire_report_message[2] = message subtype = 29
   // onewire_report_message[3] = data read
 
-  uint8_t data = ow->read();
+  //uint8_t data = ow->read();
 
-  uint8_t onewire_report_message[] = {3, ONE_WIRE_REPORT, ONE_WIRE_READ, data};
+  //uint8_t onewire_report_message[] = {3, ONE_WIRE_REPORT, ONE_WIRE_READ, data};
 
-  Serial.write(onewire_report_message, 4);
+  //Serial.write(onewire_report_message, 4);
 }
 
 // Send a OneWire reset search command
 void onewire_reset_search() {
 
-  ow->reset_search();
+  //ow->reset_search();
 }
 
 // Send a OneWire search command
 void onewire_search() {
 
-  uint8_t onewire_report_message[] = {10, ONE_WIRE_REPORT, ONE_WIRE_SEARCH,
-                                      0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-                                      0xff
-                                     };
+  //uint8_t onewire_report_message[] = {10, ONE_WIRE_REPORT, ONE_WIRE_SEARCH,
+  //                                    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+  //                                    0xff
+  //                                   };
 
-  ow->search(&onewire_report_message[3]);
-  Serial.write(onewire_report_message, 11);
+  //ow->search(&onewire_report_message[3]);
+  //Serial.write(onewire_report_message, 11);
 }
 
 // Calculate a OneWire CRC8 on a buffer containing a specified number of bytes
 void onewire_crc8() {
 
-  uint8_t crc = ow->crc8(&command_buffer[1], command_buffer[0]);
-  uint8_t onewire_report_message[] = {3, ONE_WIRE_REPORT, ONE_WIRE_CRC8, crc};
-  Serial.write(onewire_report_message, 4);
+  //uint8_t crc = ow->crc8(&command_buffer[1], command_buffer[0]);
+  //uint8_t onewire_report_message[] = {3, ONE_WIRE_REPORT, ONE_WIRE_CRC8, crc};
+  //Serial.write(onewire_report_message, 4);
 
 }
 
