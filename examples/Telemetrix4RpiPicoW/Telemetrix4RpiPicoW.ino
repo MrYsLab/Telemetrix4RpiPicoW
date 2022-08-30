@@ -417,6 +417,9 @@ bool rebooting = false;
 #define MAX_DIGITAL_PINS_SUPPORTED 100
 #define MAX_ANALOG_PINS_SUPPORTED 15
 
+// flag to indicate that an i2c command does not specify a register
+#define I2C_NO_REGISTER 254
+
 
 // To translate a pin number from an integer value to its analog pin number
 // equivalent, this array is used to look up the value to use for the pin.
@@ -824,68 +827,84 @@ void servo_detach()
 // initialize i2c data transfers
 void i2c_begin()
 {
-
-  Wire.begin();
+  byte i2c_port = command_buffer[0];
+  if (not i2c_port)
+  {
+    Wire.begin();
+  }
+  else {
+    Wire1.begin();
+  }
 }
-
 
 
 // read a number of bytes from a specific i2c register
 void i2c_read()
 {
+  // command = [PrivateConstants.I2C_READ, i2c_port, address, register,
+  //                   number_of_bytes, no_stop]
+
   // data in the incoming message:
-  // address, [0]
-  // register, [1]
-  // number of bytes, [2]
-  // stop transmitting flag [3]
-  // i2c port [4]
-  // write the register [5]
+  // i2c port [0]
+  // address, [1]
+  // register, [2] if I2C_NO_REGISTER, don't send the register value
+  // number of bytes to read, [3]
+  // stop transmitting flag [4]
 
   int message_size = 0;
-  byte address = command_buffer[0];
-  byte the_register = command_buffer[1];
+  byte port = command_buffer[0];
+  byte address = command_buffer[1];
+  byte the_register = command_buffer[2];
+  byte num_of_bytes = command_buffer[3];
+  bool stop = bool(command_buffer[4]);
+
 
   // set the current i2c port if this is for the primary i2c
-  if (command_buffer[4] == 0)
+  if (port == 0)
   {
     current_i2c_port = &Wire;
+  }
+  else {
+    current_i2c_port = &Wire1;
   }
 
 
   // write byte is true, then write the register
-  if ( command_buffer[5])
+  if ( the_register != I2C_NO_REGISTER)
   {
     current_i2c_port->beginTransmission(address);
     current_i2c_port->write((byte)the_register);
-    current_i2c_port->endTransmission(command_buffer[3]);      // default = true
+    current_i2c_port->endTransmission(stop);      // default = true
   }
-  current_i2c_port->requestFrom(address, command_buffer[2]); // all bytes are returned in requestFrom
+
+  // all bytes are returned in requestFrom
+  current_i2c_port->requestFrom(address, num_of_bytes, stop);
 
   // check to be sure correct number of bytes were returned by slave
-  if (command_buffer[2] < current_i2c_port->available())
-  {
-    byte report_message[4] = {3, I2C_TOO_FEW_BYTES_RCVD, 1, address};
-    Serial.write(report_message, 4);
-    return;
-  }
-  else if (command_buffer[2] > current_i2c_port->available())
+  if (num_of_bytes < current_i2c_port->available())
   {
     byte report_message[4] = {3, I2C_TOO_MANY_BYTES_RCVD, 1, address};
     Serial.write(report_message, 4);
     return;
   }
+  else if (num_of_bytes > current_i2c_port->available())
+  {
+    byte report_message[4] = {3, I2C_TOO_FEW_BYTES_RCVD, 1, address};
+    Serial.write(report_message, 4);
+    return;
+  }
 
   // packet length
-  i2c_report_message[0] = command_buffer[2] + 5;
+  i2c_report_message[0] = num_of_bytes + 5;
 
   // report type
   i2c_report_message[1] = I2C_READ_REPORT;
 
   // i2c_port
-  i2c_report_message[2] = command_buffer[4];
+  i2c_report_message[2] = port;
 
   // number of bytes read
-  i2c_report_message[3] = command_buffer[2]; // number of bytes
+  i2c_report_message[3] = num_of_bytes; // number of bytes
 
   // device address
   i2c_report_message[4] = address;
@@ -894,7 +913,8 @@ void i2c_read()
   i2c_report_message[5] = the_register;
 
   // append the data that was read
-  for (message_size = 0; message_size < command_buffer[2] && current_i2c_port->available(); message_size++)
+  for (message_size = 0; message_size < num_of_bytes && current_i2c_port->available()
+       ; message_size++)
   {
     i2c_report_message[6 + message_size] = current_i2c_port->read();
   }
@@ -909,23 +929,25 @@ void i2c_read()
 // write a specified number of bytes to an i2c device
 void i2c_write()
 {
-  // command_buffer[0] is the number of bytes to send
+  // command_buffer[0] = i2c port
   // command_buffer[1] is the device address
-  // command_buffer[2] is the i2c port
-  // additional bytes to write= command_buffer[3..];
+  // command_buffer[2] is the number of bytes to send
+  // command_buffer[3...] are the bytes to write
+
 
   // set the current i2c port if this is for the primary i2c
-  if (command_buffer[2] == 0)
+  if (command_buffer[0] == 0)
   {
     current_i2c_port = &Wire;
   }
-
-
+  else {
+    current_i2c_port = &Wire1;
+  }
 
   current_i2c_port->beginTransmission(command_buffer[1]);
 
   // write the data to the device
-  for (int i = 0; i < command_buffer[0]; i++)
+  for (int i = 0; i < command_buffer[2]; i++)
   {
     current_i2c_port->write(command_buffer[i + 3]);
   }
@@ -1834,7 +1856,7 @@ void loop()
     get_next_command();
 
     if (!stop_reports)
-    { // stop reporting
+    {
       scan_digital_inputs();
       scan_analog_inputs();
       scan_sonars();
