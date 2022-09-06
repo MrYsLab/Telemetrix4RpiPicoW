@@ -372,6 +372,21 @@ byte i2c_report_message[64];
 // a pointer to i2c port in use
 TwoWire *current_i2c_port = NULL;
 
+// a pointer to the spi port in use
+SPIClassRP2040 *current_spi_port = NULL;
+
+// spi settings values
+uint32_t clock0;
+BitOrder bitOrder0;
+SPIMode dataMode0;
+uint8_t chipSelect0;
+
+uint32_t clock1;
+BitOrder bitOrder1;
+SPIMode dataMode1;
+uint8_t chipSelect1;
+
+
 // A buffer to hold spi report data
 byte spi_report_message[64];
 
@@ -523,6 +538,16 @@ byte dht_index = 0; // index into dht struct
 unsigned long dht_current_millis;      // for analog input loop
 unsigned long dht_previous_millis;     // for analog input loop
 unsigned int dht_scan_interval = 2200; // scan dht's every 2 seconds
+
+// spi interface pins
+#define SPI0_MISO 16
+#define SPI1_MISO 12
+
+#define SPI0_MOSI 19
+#define SPI1_MOSI 19
+
+#define SPI0_CLK 18
+#define SPI1_CLK 14
 
 
 /* OneWire Object*/
@@ -990,79 +1015,164 @@ void dht_new()
 // initialize the SPI interface
 void init_spi() {
 
-  int cs_pin;
+  // command buffer received:
+  // spi_port, chip_select, freq_bytes[0], freq_bytes[1], freq_bytes[2], freq_bytes[3],
+  // data_order, data_mode
 
-  //Serial.print(command_buffer[1]);
-  // initialize chip select GPIO pins
-  for (int i = 0; i < command_buffer[0]; i++) {
-    cs_pin = command_buffer[1 + i];
-    // Chip select is active-low, so we'll initialise it to a driven-high state
-    pinMode(cs_pin, OUTPUT);
-    digitalWrite(cs_pin, HIGH);
+  int spi_port = command_buffer[0];
+  int chip_select = command_buffer[1];
+
+  if (spi_port == 0) {
+    clock0 = (uint32_t)(command_buffer[2]) << 24;
+    clock0 += (uint32_t)(command_buffer[3]) << 16;
+    clock0 += command_buffer[4] << 8;
+    clock0 += command_buffer[5] ;
+
+    bitOrder0 = (BitOrder)command_buffer[6];
+    dataMode0 = (SPIMode)command_buffer[7];
+    chipSelect0 = chip_select;
+
+    current_spi_port = &SPI;
   }
-  SPI.begin();
+
+  else {
+    clock1 = (uint32_t)(command_buffer[2]) << 24;
+    clock1 += (uint32_t)(command_buffer[3]) << 16;
+    clock1 += command_buffer[4] << 8;
+    clock1 += command_buffer[5] ;
+
+    bitOrder1 = (BitOrder)command_buffer[6];
+    dataMode1 = (SPIMode)command_buffer[7];
+
+    chipSelect1 = chip_select;
+
+    current_spi_port = &SPI1;
+
+
+  }
+
+  // Chip select is active-low, so we'll initialise it to a driven-high state
+  pinMode(chip_select, OUTPUT);
+  digitalWrite(chip_select, HIGH);
+
+  current_spi_port->begin();
 }
 
-// write a number of blocks to the SPI device
+// write a number of bytes to the SPI device
 void write_blocking_spi() {
-  int num_bytes = command_buffer[0];
 
-  for (int i = 0; i < num_bytes; i++) {
-    SPI.transfer(command_buffer[1 + i] );
+  int chipSelect;
+  // command[0] == spi port
+  // command[1] == number of bytes to write
+  // command[2 ...] bytes to write
+  int num_bytes = command_buffer[1];
+
+  if (command_buffer[0] == 0) {
+    current_spi_port = &SPI;
+    SPISettings mySetting(clock0, bitOrder0, dataMode0);
+    chipSelect = chipSelect0;
+    current_spi_port->beginTransaction(mySetting);
+
   }
+  else {
+    current_spi_port = &SPI1;
+    SPISettings mySetting(clock1, bitOrder1, dataMode1);
+    chipSelect = chipSelect1;
+    current_spi_port->beginTransaction(mySetting);
+
+  }
+  digitalWrite(chipSelect, LOW);
+  for (int i = 0; i < num_bytes; i++) {
+    current_spi_port->transfer(command_buffer[2 + i] );
+  }
+  digitalWrite(chipSelect, LOW);
+  current_spi_port->endTransaction();
+
 }
 
 // read a number of bytes from the SPI device
 void read_blocking_spi() {
-  // command_buffer[0] == number of bytes to read
-  // command_buffer[1] == read register
+  int chipSelect;
+
+  // command_buffer[0] == spi register
+  // command_buffer[1] == number of bytes to read
+  // command_buffer[2] == spi_port
+
+  uint8_t spi_register, number_of_bytes, spi_port;
+
+  spi_register = command_buffer[0];
+  number_of_bytes = command_buffer[1];
+  spi_port = command_buffer[2];
+
+  if (spi_port == 0) {
+    current_spi_port = &SPI;
+    SPISettings mySetting(clock0, bitOrder0, dataMode0);
+    chipSelect = chipSelect0;
+    current_spi_port->beginTransaction(mySetting);
+
+  }
+  else {
+    current_spi_port = &SPI1;
+    SPISettings mySetting(clock1, bitOrder1, dataMode1);
+    chipSelect = chipSelect1;
+    current_spi_port->beginTransaction(mySetting);
+
+  }
 
   // spi_report_message[0] = length of message including this element
   // spi_report_message[1] = SPI_REPORT
+  // spi_report_message[2] = port number
   // spi_report_message[2] = register used for the read
   // spi_report_message[3] = number of bytes returned
   // spi_report_message[4..] = data read
 
   // configure the report message
   // calculate the packet length
-  spi_report_message[0] = command_buffer[0] + 3; // packet length
+  spi_report_message[0] = command_buffer[2] + 3; // packet length
   spi_report_message[1] = SPI_REPORT;
-  spi_report_message[2] = command_buffer[1]; // register
-  spi_report_message[3] = command_buffer[0]; // number of bytes read
+  spi_report_message[2] = command_buffer[0];
+  spi_report_message[3] = command_buffer[1]; // register
+  spi_report_message[43] = command_buffer[2]; // number of bytes read
 
   // write the register out. OR it with 0x80 to indicate a read
-  SPI.transfer(command_buffer[1] | 0x80);
+  current_spi_port->transfer(spi_register | 0x80);
 
   // now read the specified number of bytes and place
   // them in the report buffer
-  for (int i = 0; i < command_buffer[0] ; i++) {
-    spi_report_message[i + 4] = SPI.transfer(0x00);
+
+  digitalWrite(chipSelect, LOW);
+  for (int i = 0; i < number_of_bytes ; i++) {
+    spi_report_message[i + 4] = current_spi_port->transfer(0x00);
+
   }
-  Serial.write(spi_report_message, command_buffer[0] + 4);
+  digitalWrite(chipSelect, LOW);
+  current_spi_port->endTransaction();
+  Serial.write(spi_report_message, command_buffer[2] + 4);
 }
 
 // modify the SPI format
 void set_format_spi() {
 
-#if defined(__AVR__)
-  SPISettings(command_buffer[0], command_buffer[1], command_buffer[2]);
-#else
-  BitOrder b;
+  //#if defined(__AVR__)
+  //  SPISettings(command_buffer[0], command_buffer[1], command_buffer[2]);
+  //#else
+  //  BitOrder b;
 
-  if (command_buffer[1]) {
-    b = MSBFIRST;
-  } else {
-    b = LSBFIRST;
-  }
-  SPISettings(command_buffer[0], b, command_buffer[2]);
-#endif // avr
+  //  if (command_buffer[1]) {
+  //    b = MSBFIRST;
+  // } else {
+  //    b = LSBFIRST;
+  //  }
+  //  SPISettings(command_buffer[0], b, command_buffer[2]);
+  //#endif // avr
 }
 
 // set the SPI chip select line
 void spi_cs_control() {
-  int cs_pin = command_buffer[0];
-  int cs_state = command_buffer[1];
-  digitalWrite(cs_pin, cs_state);
+  //int spi_cs_pin = command_buffer[0];
+  //int cs_state = command_buffer[1];
+
+  //digitalWrite(spi_cs_pin, cs_state);
 }
 
 /* onewire is not yet implemented for the pico. these are place holders */
