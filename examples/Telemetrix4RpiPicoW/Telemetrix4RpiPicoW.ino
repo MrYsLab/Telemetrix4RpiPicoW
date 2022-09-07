@@ -544,7 +544,7 @@ unsigned int dht_scan_interval = 2200; // scan dht's every 2 seconds
 #define SPI1_MISO 12
 
 #define SPI0_MOSI 19
-#define SPI1_MOSI 19
+#define SPI1_MOSI 15
 
 #define SPI0_CLK 18
 #define SPI1_CLK 14
@@ -1029,7 +1029,9 @@ void init_spi() {
     clock0 += command_buffer[5] ;
 
     bitOrder0 = (BitOrder)command_buffer[6];
+
     dataMode0 = (SPIMode)command_buffer[7];
+
     chipSelect0 = chip_select;
 
     current_spi_port = &SPI;
@@ -1047,15 +1049,12 @@ void init_spi() {
     chipSelect1 = chip_select;
 
     current_spi_port = &SPI1;
-
-
   }
 
   // Chip select is active-low, so we'll initialise it to a driven-high state
+  current_spi_port->begin();
   pinMode(chip_select, OUTPUT);
   digitalWrite(chip_select, HIGH);
-
-  current_spi_port->begin();
 }
 
 // write a number of bytes to the SPI device
@@ -1087,22 +1086,22 @@ void write_blocking_spi() {
   }
   digitalWrite(chipSelect, LOW);
   current_spi_port->endTransaction();
-
 }
 
 // read a number of bytes from the SPI device
 void read_blocking_spi() {
   int chipSelect;
+  uint8_t id = 199;
 
-  // command_buffer[0] == spi register
-  // command_buffer[1] == number of bytes to read
-  // command_buffer[2] == spi_port
+  // command_buffer[0] == spi port
+  // command_buffer[1] == register
+  // command_buffer[2] == number of bytes to read
 
   uint8_t spi_register, number_of_bytes, spi_port;
 
-  spi_register = command_buffer[0];
-  number_of_bytes = command_buffer[1];
-  spi_port = command_buffer[2];
+  spi_port = command_buffer[0];
+  spi_register = command_buffer[1];
+  number_of_bytes = command_buffer[2];
 
   if (spi_port == 0) {
     current_spi_port = &SPI;
@@ -1128,11 +1127,14 @@ void read_blocking_spi() {
 
   // configure the report message
   // calculate the packet length
-  spi_report_message[0] = command_buffer[2] + 3; // packet length
+  spi_report_message[0] = number_of_bytes + 5; // packet length
   spi_report_message[1] = SPI_REPORT;
-  spi_report_message[2] = command_buffer[0];
-  spi_report_message[3] = command_buffer[1]; // register
-  spi_report_message[43] = command_buffer[2]; // number of bytes read
+  spi_report_message[2] = spi_port;
+  spi_report_message[3] = spi_register; // register
+  spi_report_message[4] = number_of_bytes; // number of bytes read
+
+
+  digitalWrite(chipSelect, LOW);
 
   // write the register out. OR it with 0x80 to indicate a read
   current_spi_port->transfer(spi_register | 0x80);
@@ -1140,15 +1142,17 @@ void read_blocking_spi() {
   // now read the specified number of bytes and place
   // them in the report buffer
 
-  digitalWrite(chipSelect, LOW);
-  for (int i = 0; i < number_of_bytes ; i++) {
-    spi_report_message[i + 4] = current_spi_port->transfer(0x00);
 
+  for (int i = 0; i < number_of_bytes ; i++) {
+    spi_report_message[i + 5] = current_spi_port->transfer(0x00);
+    id = current_spi_port->transfer(0x00);
   }
   digitalWrite(chipSelect, LOW);
   current_spi_port->endTransaction();
-  Serial.write(spi_report_message, command_buffer[2] + 4);
+
+  Serial.write(spi_report_message, number_of_bytes + 6);
 }
+
 
 // modify the SPI format
 void set_format_spi() {
