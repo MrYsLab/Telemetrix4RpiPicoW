@@ -15,24 +15,6 @@
   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 */
 
-
-// This file is rather large, so it has been rearranged in logical sections.
-// Here is the list of sections to help make it easier to locate items of interest,
-// and aid when adding new features.
-
-// 1. Feature Enabling Defines
-// 2. Arduino ID
-// 3. Client Command Related Defines and Support
-// 4. Server Report Related Defines
-// 5. i2c Related Defines
-// 6. Pin Related Defines And Data Structures
-// 7. Feature Related Defines, Data Structures and Storage Allocation
-// 8. Command Functions
-// 9. Scanning Inputs, Generating Reports And Running Steppers
-// 10. Setup and Loop
-
-
-
 #include <Arduino.h>
 #include "Telemetrix4RpiPicoW.h"
 #include <Servo.h>
@@ -252,9 +234,9 @@ extern void set_pwm_range();
 extern void get_cpu_temp();
 
 // When adding a new command update the command_table.
+// Every command received begins with a length byte.
 // The command length is the number of bytes that follow
-// the command byte itself, and does not include the command
-// byte in its length.
+// the command byte itself.
 
 // The command_func is a pointer the command's function.
 struct command_descriptor
@@ -1153,26 +1135,12 @@ void read_blocking_spi() {
   Serial.write(spi_report_message, number_of_bytes + 6);
 }
 
-
-// modify the SPI format
-void set_format_spi() {
-
-  //#if defined(__AVR__)
-  //  SPISettings(command_buffer[0], command_buffer[1], command_buffer[2]);
-  //#else
-  //  BitOrder b;
-
-  //  if (command_buffer[1]) {
-  //    b = MSBFIRST;
-  // } else {
-  //    b = LSBFIRST;
-  //  }
-  //  SPISettings(command_buffer[0], b, command_buffer[2]);
-  //#endif // avr
+void set_format_spi(){
 }
 
 // set the SPI chip select line
 void spi_cs_control() {
+  // no longer being used
   //int spi_cs_pin = command_buffer[0];
   //int cs_state = command_buffer[1];
 
