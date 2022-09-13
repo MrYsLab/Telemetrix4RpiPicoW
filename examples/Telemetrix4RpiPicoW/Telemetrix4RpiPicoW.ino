@@ -1929,7 +1929,7 @@ void setup()
 {
   Serial.begin(115200);
   WiFi.mode(WIFI_STA);
-
+  WiFi.setHostname("Telemetrix_pico_w");
   WiFi.begin(ssid, password);
 
   pinMode(LED_BUILTIN, OUTPUT);
