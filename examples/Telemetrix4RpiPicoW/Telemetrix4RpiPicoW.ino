@@ -28,8 +28,8 @@
 #include <NeoPixelConnect.h>
 
 // Modify the next two lines to match your network values
-const char *ssid = "A-Net";
-const char *password = "Sam2Curly";
+const char *ssid = "YOUR-SSID";
+const char *password = "YOUR-PASSWORD";
 
 // Default ip port value.
 // Set the telemetrix or telemetrix-aio port to the same value
@@ -743,6 +743,8 @@ void modify_reporting()
 
 void reset_board() {
   stop_all_reports();
+  client.flush();
+  client.stop();
 
   delay(100);
   rebooting = true;
