@@ -28,8 +28,8 @@
 #include <NeoPixelConnect.h>
 
 // Modify the next two lines to match your network values
-const char *ssid = "YOUR_SSID";
-const char *password = "YOUR_PASSWORD";
+const char *ssid = "A-Net";
+const char *password = "Sam2Curly";
 
 // Default ip port value.
 // Set the telemetrix or telemetrix-aio port to the same value
@@ -1931,6 +1931,7 @@ void setup()
   WiFi.mode(WIFI_STA);
   WiFi.setHostname("Telemetrix_pico_w");
   WiFi.begin(ssid, password);
+  delay(500);
 
   pinMode(LED_BUILTIN, OUTPUT);
 
@@ -1941,7 +1942,7 @@ void setup()
 
   while (WiFi.status() != WL_CONNECTED)
   {
-    delay(1000);
+    delay(100);
     Serial.print(".");
   }
 
