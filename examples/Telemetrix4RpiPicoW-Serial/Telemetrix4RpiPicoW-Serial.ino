@@ -1,5 +1,5 @@
 /*
-  Copyright (c) 2020-2022 Alan Yorinks All rights reserved.
+  Copyright (c) 2025 Alan Yorinks All rights reserved.
 
   This program is free software; you can redistribute it and/or
   modify it under the terms of the GNU AFFERO GENERAL PUBLIC LICENSE
@@ -20,23 +20,12 @@
 #include <Servo.h>
 #include <NanoConnectHcSr04.h>
 #include <Wire.h>
-#include <WiFi.h>
 #include <dhtnew.h>
 #include <SPI.h>
 //#include <OneWire.h> // library is not available for the pico
 #include <AccelStepper.h>
 #include <NeoPixelConnect.h>
 
-// Modify the next two lines to match your network values
-const char *ssid = "YOUR_SSID";
-const char *password = "YOUR_PASSWORD";
-
-// Default ip port value.
-// Set the telemetrix or telemetrix-aio port to the same value
-
-uint16_t PORT = 31335;
-
-WiFiServer wifiServer(PORT);
 
 /* %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 /*         Client Command Related Defines and Support               */
@@ -329,9 +318,6 @@ command_descriptor command_table[] = {
 // buffer to hold incoming command data
 byte command_buffer[MAX_COMMAND_LENGTH];
 
-// wifi client connection
-WiFiClient client;
-
 /* %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 /*                 Reporting Defines and Support                    */
 /* %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
@@ -402,8 +388,8 @@ bool rebooting = false;
 #define DHT_READ_ERROR 1
 
 // firmware version - update this when bumping the version
-#define FIRMWARE_MAJOR 1
-#define FIRMWARE_MINOR 1
+#define FIRMWARE_MAJOR 2
+#define FIRMWARE_MINOR 0
 #define FIRMWARE_PATCH 0
 
 /* %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
@@ -563,13 +549,13 @@ void send_debug_info(byte id, int value) {
   debug_buffer[2] = id;
   debug_buffer[3] = highByte(value);
   debug_buffer[4] = lowByte(value);
-  client.write(debug_buffer, 5);
+  Serial.write(debug_buffer, 5);
 }
 
 // a function to loop back data over the serial port
 void serial_loopback() {
   byte loop_back_buffer[3] = { 2, (byte)SERIAL_LOOP_BACK, command_buffer[0] };
-  client.write(loop_back_buffer, 3);
+  Serial.write(loop_back_buffer, 3);
 }
 
 void set_pin_mode()
@@ -720,13 +706,7 @@ void modify_reporting() {
 
 void reset_board() {
   stop_all_reports();
-  client.flush();
-  client.stop();
-  WiFi.disconnect();
-
-  //wifiServer.stop();
-  //wifiServer.close();
-
+  Serial.flush();
   delay(100);
   rebooting = true;
   rp2040.reboot();
@@ -736,7 +716,7 @@ void reset_board() {
 void get_firmware_version() {
   byte report_message[5] = { 4, FIRMWARE_REPORT, FIRMWARE_MAJOR, FIRMWARE_MINOR,
                              FIRMWARE_PATCH };
-  client.write(report_message, 5);
+  Serial.write(report_message, 5);
 }
 
 /***************************************************
@@ -774,7 +754,7 @@ void servo_attach() {
   } else {
     // no open servos available, send a report back to client
     byte report_message[2] = { SERVO_UNAVAILABLE, pin };
-    client.write(report_message, 2);
+    Serial.write(report_message, 2);
   }
 }
 
@@ -862,11 +842,11 @@ void i2c_read() {
   // check to be sure correct number of bytes were returned by slave
   if (num_of_bytes < current_i2c_port->available()) {
     byte report_message[4] = { 3, I2C_TOO_MANY_BYTES_RCVD, 1, address };
-    client.write(report_message, 4);
+    Serial.write(report_message, 4);
     return;
   } else if (num_of_bytes > current_i2c_port->available()) {
     byte report_message[4] = { 3, I2C_TOO_FEW_BYTES_RCVD, 1, address };
-    client.write(report_message, 4);
+    Serial.write(report_message, 4);
     return;
   }
 
@@ -895,7 +875,7 @@ void i2c_read() {
   // send slave address, register and received bytes
 
   for (int i = 0; i < message_size + 6; i++) {
-    client.write(i2c_report_message[i]);
+    Serial.write(i2c_report_message[i]);
   }
 }
 
@@ -1088,7 +1068,7 @@ void read_blocking_spi() {
   digitalWrite(chipSelect, LOW);
   current_spi_port->endTransaction();
 
-  client.write(spi_report_message, number_of_bytes + 6);
+  Serial.write(spi_report_message, number_of_bytes + 6);
 }
 
 void set_format_spi() {
@@ -1330,7 +1310,7 @@ void stepper_get_distance_to_go() {
   report_message[6] = (byte)((dtg & 0x000000FF));
 
   // motor_id = command_buffer[0]
-  client.write(report_message, 7);
+  Serial.write(report_message, 7);
 }
 
 void stepper_get_target_position() {
@@ -1351,7 +1331,7 @@ void stepper_get_target_position() {
   report_message[6] = (byte)((target & 0x000000FF));
 
   // motor_id = command_buffer[0]
-  client.write(report_message, 7);
+  Serial.write(report_message, 7);
 }
 
 void stepper_get_current_position() {
@@ -1372,7 +1352,7 @@ void stepper_get_current_position() {
   report_message[6] = (byte)((position & 0x000000FF));
 
   // motor_id = command_buffer[0]
-  client.write(report_message, 7);
+  Serial.write(report_message, 7);
 }
 
 void stepper_set_current_position() {
@@ -1450,7 +1430,7 @@ void stepper_is_running() {
 
   report_message[3] = steppers[command_buffer[0]]->isRunning();
 
-  client.write(report_message, 4);
+  Serial.write(report_message, 4);
 }
 
 // stop all reports from being generated
@@ -1458,12 +1438,12 @@ void stepper_is_running() {
 void stop_all_reports() {
   stop_reports = true;
   delay(20);
-  client.flush();
+  Serial.flush();
 }
 
 // enable all reports to be generated
 void enable_all_reports() {
-  client.flush();
+  Serial.flush();
   stop_reports = false;
   delay(20);
 }
@@ -1478,18 +1458,18 @@ void get_next_command() {
   memset(command_buffer, 0, sizeof(command_buffer));
 
   // if there is no command waiting, then return
-  if (not client.available()) {
+  if (not Serial.available()) {
     return;
   }
   // get the packet length
-  packet_length = (byte)client.read();
+  packet_length = (byte)Serial.read();
 
-  while (not client.available()) {
+  while (not Serial.available()) {
     delay(1);
   }
 
   // get the command byte
-  command = (byte)client.read();
+  command = (byte)Serial.read();
 
 
   // uncomment the next line to see the packet length and command
@@ -1500,10 +1480,10 @@ void get_next_command() {
     // get the data for that command
     for (int i = 0; i < packet_length - 1; i++) {
       // need this delay or data read is not correct
-      while (not client.available()) {
+      while (not Serial.available()) {
         delay(1);
       }
-      command_buffer[i] = (byte)client.read();
+      command_buffer[i] = (byte)Serial.read();
       // uncomment out to see each of the bytes following the command
       // send_debug_info(i, command_buffer[i]);
     }
@@ -1592,7 +1572,7 @@ void scan_digital_inputs() {
           the_digital_pins[i].last_value = value;
           report_message[2] = (byte)i;
           report_message[3] = value;
-          client.write(report_message, 4);
+          Serial.write(report_message, 4);
         }
       }
     }
@@ -1637,7 +1617,7 @@ void scan_analog_inputs() {
             report_message[2] = (byte)i;
             report_message[3] = highByte(value);  // get high order byte
             report_message[4] = lowByte(value);
-            client.write(report_message, 5);
+            Serial.write(report_message, 5);
             delay(1);
           }
         }
@@ -1668,7 +1648,7 @@ void scan_cpu_temp() {
         report_message[3] = output[1];
         report_message[4] = output[2];
         report_message[5] = output[3];
-        client.write(report_message, 6);
+        Serial.write(report_message, 6);
         delay(1);
       }
     }
@@ -1702,8 +1682,7 @@ void scan_sonars() {
           frac = (uint8_t)f;
           byte report_message[5] = { 4, SONAR_DISTANCE, sonars[last_sonar_visited].trigger_pin,
                                      integ, frac };
-          //client.write(report_message, 5);
-          client.write(report_message, 5);
+          Serial.write(report_message, 5);
         }
         last_sonar_visited++;
         if (last_sonar_visited == sonars_index) {
@@ -1763,7 +1742,7 @@ void scan_dhts() {
 
         // if rv is not zero, this is an error report
         if (rv) {
-          client.write(report_message, 10);
+          Serial.write(report_message, 10);
           return;
         } else {
           float j, f;
@@ -1789,7 +1768,7 @@ void scan_dhts() {
 
           report_message[8] = (uint8_t)j;
           report_message[9] = (uint8_t)(f * 100);
-          client.write(report_message, 10);
+          Serial.write(report_message, 10);
         }
       }
     }
@@ -1814,7 +1793,7 @@ void run_steppers() {
           running = steppers[i]->isRunning();
           if (!running) {
             byte report_message[3] = { 2, STEPPER_RUN_COMPLETE_REPORT, (byte)i };
-            client.write(report_message, 3);
+            Serial.write(report_message, 3);
             stepper_run_modes[i] = STEPPER_STOP;
           }
           break;
@@ -1826,7 +1805,7 @@ void run_steppers() {
           target_position = steppers[i]->targetPosition();
           if (target_position == steppers[i]->currentPosition()) {
             byte report_message[3] = { 2, STEPPER_RUN_COMPLETE_REPORT, (byte)i };
-            client.write(report_message, 3);
+            Serial.write(report_message, 3);
             stepper_run_modes[i] = STEPPER_STOP;
           }
           break;
@@ -1843,37 +1822,30 @@ void run_steppers() {
 
 void setup() {
   Serial.begin(115200);
-  WiFi.mode(WIFI_STA);
-  WiFi.setHostname("Telemetrix_pico_w");
-  WiFi.begin(ssid, password);
-  delay(500);
 
   pinMode(LED_BUILTIN, OUTPUT);
 
   // turn on LED
   digitalWrite(LED_BUILTIN, HIGH);
 
-  Serial.print("\n\nAllow 15 seconds for connection to complete..");
+  delay(.5);
 
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(100);
-    Serial.print(".");
-  }
+    // Turn off LED
+    digitalWrite(LED_BUILTIN, LOW);
 
-  Serial.println();
+  delay(.5);
 
-  // Turn off LED
-  digitalWrite(LED_BUILTIN, LOW);
+    // turn on LED
+    digitalWrite(LED_BUILTIN, HIGH);
 
-  Serial.print("Connected to WiFi. IP Address: ");
-  Serial.print(WiFi.localIP());
+  delay(.5);
 
-  Serial.print("  IP Port: ");
-  Serial.println(PORT);
+    // Turn off LED
+    digitalWrite(LED_BUILTIN, LOW);
 
-  wifiServer.begin();
+  delay(.5);
 
-  for (int i = 0; i < MAX_NUMBER_OF_STEPPERS; i++) {
+    for (int i = 0; i < MAX_NUMBER_OF_STEPPERS; i++) {
     stepper_run_modes[i] = STEPPER_STOP;
   }
   // set the range to be compatible with the non-wifi pico telemetrix library
@@ -1883,31 +1855,17 @@ void setup() {
 
 void loop() {
 
-
   if (!rebooting) {
     // keep processing incoming commands
+    get_next_command();
 
-    client = wifiServer.available();
-
-    if (client) {
-      Serial.print("Client Connected to address: ");
-      Serial.println(client.remoteIP());
-
-      while (client.connected()) {
-        delay(1);
-        get_next_command();
-
-        if (!stop_reports) {
-          scan_digital_inputs();
-          scan_analog_inputs();
-          scan_sonars();
-          scan_dhts();
-          scan_cpu_temp();
-          run_steppers();
-        }
-      }
-      client.stop();
-      Serial.println("Client disconnected");
+    if (!stop_reports) {
+      scan_digital_inputs();
+      scan_analog_inputs();
+      scan_sonars();
+      scan_dhts();
+      scan_cpu_temp();
+      run_steppers();
     }
   }
 }
