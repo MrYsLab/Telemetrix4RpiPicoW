@@ -404,7 +404,7 @@ bool rebooting = false;
 // firmware version - update this when bumping the version
 #define FIRMWARE_MAJOR 2
 #define FIRMWARE_MINOR 2
-#define FIRMWARE_PATCH 0
+#define TRANSPORT_TYPE 0  // this is fixed and should not be changes
 
 /* %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%*/
 /*           Pin Related Defines And Data Structures                */
@@ -735,7 +735,7 @@ void reset_board() {
 // Return the firmware version number
 void get_firmware_version() {
   byte report_message[5] = { 4, FIRMWARE_REPORT, FIRMWARE_MAJOR, FIRMWARE_MINOR,
-                             FIRMWARE_PATCH };
+                             TRANSPORT_TYPE };
   client.write(report_message, 5);
 }
 
